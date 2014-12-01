@@ -38,10 +38,6 @@ func NewTunnel(faddr, baddr string, clientMode bool, cryptoMethod, secret string
 }
 
 func (t *Tunnel) pipe(dst, src *Conn, c chan int64) {
-    defer func() {
-        dst.CloseWrite()
-        src.CloseRead()
-    }()
     n, err := io.Copy(dst, src)
     if err != nil {
         log.Print(err)
@@ -58,23 +54,26 @@ func (t *Tunnel) transport(conn net.Conn) {
     }
     connectTime := time.Now().Sub(start)
     start = time.Now()
-    cipher := NewCipher(t.cryptoMethod, t.secret)
+   cipher := NewCipher(t.cryptoMethod, t.secret)
     readChan := make(chan int64)
     writeChan := make(chan int64)
     var readBytes, writeBytes int64
     atomic.AddInt32(&t.sessionsCount, 1)
     var bconn, fconn *Conn
     if t.clientMode {
-        fconn = NewConn(conn, nil, t.pool)
-        bconn = NewConn(conn2, cipher, t.pool)
+        fconn = NewConn(conn, false, nil, t.pool)
+        bconn = NewConn(conn2, true, cipher, t.pool)
     } else {
-        fconn = NewConn(conn, cipher, t.pool)
-        bconn = NewConn(conn2, nil, t.pool)
+        fconn = NewConn(conn, true, cipher, t.pool)
+        bconn = NewConn(conn2, false, nil, t.pool)
     }
+
     go t.pipe(bconn, fconn, writeChan)
     go t.pipe(fconn, bconn, readChan)
     readBytes = <-readChan
     writeBytes = <-writeChan
+    fconn.Close()
+    bconn.Close()
     transferTime := time.Now().Sub(start)
     log.Printf("r:%d w:%d ct:%.3f t:%.3f [#%d]", readBytes, writeBytes,
         connectTime.Seconds(), transferTime.Seconds(), t.sessionsCount)

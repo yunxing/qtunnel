@@ -7,5 +7,8 @@ all:
 clean:
 	@rm -fr bin pkg
 
+dep:
+	@GOPATH=$(GOPATH) go get github.com/mreiferson/go-snappystream
+
 test:
-	@GOPATH=$(GOPATH) go test tunnel
+	@GOPATH=$(GOPATH) go test tunnel -timeout 2s

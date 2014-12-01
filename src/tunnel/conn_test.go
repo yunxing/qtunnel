@@ -59,8 +59,8 @@ func TestWrite(t *testing.T) {
     if err != nil {
         t.Error(err)
     }
-    conn2 := NewConn(conn, NewCipher("rc4", secret), pool)
-    defer conn2.Close()
+    conn2 := NewConn(conn, false, NewCipher("rc4", secret), pool)
+	defer conn.Close()
     total := 0
     n, err := conn2.Write(data2)
     for {
@@ -115,8 +115,8 @@ func TestRead(t *testing.T) {
     if err != nil {
         t.Error(err)
     }
-    conn2 := NewConn(conn, NewCipher("rc4", secret), pool)
-    defer conn2.Close()
+    conn2 := NewConn(conn, false, NewCipher("rc4", secret), pool)
+	defer conn.Close()
     buf := make([]byte, len(data2))
     total := 0
     n, err := conn2.Read(buf)

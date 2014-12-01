@@ -2,55 +2,55 @@ package tunnel
 
 import (
     "net"
-    "time"
+    "io"
+    "fmt"
+    snappy "github.com/mreiferson/go-snappystream"
 )
 
 type Conn struct {
-    conn net.Conn
+    reader   io.Reader
+    writer   io.WriteCloser
     cipher *Cipher
     pool *recycler
 }
 
-func NewConn(conn net.Conn, cipher *Cipher, pool *recycler) *Conn {
+func NewConn(conn net.Conn, compress bool, cipher *Cipher, pool *recycler) *Conn {
+    var reader io.Reader= conn
+    var writer io.WriteCloser= conn
+    if compress {
+        reader = snappy.NewReader(conn, false)
+        writer = snappy.NewBufferedWriter(conn)
+    }
     return &Conn{
-        conn: conn,
+        reader: reader,
+        writer: writer,
         cipher: cipher,
         pool: pool,
     }
 }
 
 func (c *Conn) Read(b []byte) (int, error) {
-    c.conn.SetReadDeadline(time.Now().Add(30 * time.Minute))
     if c.cipher == nil {
-        return c.conn.Read(b)
+        return c.reader.Read(b)
     }
-    n, err := c.conn.Read(b)
+    n, err := c.reader.Read(b)
+    fmt.Printf("here5.5 %v\n", err)
     if n > 0 {
+        fmt.Println("here6")
         c.cipher.decrypt(b[0:n], b[0:n])
+        fmt.Println("here7")
     }
     return n, err
 }
 
 func (c *Conn) Write(b []byte) (int, error) {
     if c.cipher == nil {
-        return c.conn.Write(b)
+        return c.writer.Write(b)
     }
     c.cipher.encrypt(b, b)
-    return c.conn.Write(b)
+    return c.writer.Write(b)
 }
 
-func (c *Conn) Close() {
-    c.conn.Close()
-}
-
-func (c *Conn) CloseRead() {
-    if conn, ok := c.conn.(*net.TCPConn); ok {
-        conn.CloseRead()
-    }
-}
-
-func (c *Conn) CloseWrite() {
-    if conn, ok := c.conn.(*net.TCPConn); ok {
-        conn.CloseWrite()
-    }
+func (c *Conn) Close() error {
+    return c.writer.Close()
 }
